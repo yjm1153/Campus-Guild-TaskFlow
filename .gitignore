@@ -1,0 +1,22 @@
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Windows
+Thumbs.db
+
+# Project specific
+server/data/
+server/target/
+
+# Maven wrapper jar (保留 wrapper 脚本)
+server/.mvn/wrapper/maven-wrapper.jar

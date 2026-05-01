@@ -1,0 +1,43 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/campusguild;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+
+# --- 切换 MySQL 生产环境时取消注释 ---
+#spring:
+#  datasource:
+#    url: jdbc:mysql://localhost:3306/campus_guild?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+#    username: root
+#    password: your_password
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#    show-sql: false
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.MySQLDialect
+
+---
+# ====================== SQL 建表脚本参考 ======================
+# 生产环境建议使用 ddl-auto: validate 并手动执行 sql/schema.sql
+# ------------------------------------------------------------
