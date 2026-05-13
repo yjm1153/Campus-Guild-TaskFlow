@@ -23,7 +23,7 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:dev-secret-key-for-campus-guild-local}
   expiration: 86400000
 
 springdoc:
