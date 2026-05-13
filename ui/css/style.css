@@ -327,3 +327,15 @@ a.task-card { color: inherit; }
 .admin-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--gray-100); }
 .admin-pagination-info { font-size: 0.875rem; color: var(--gray-500); }
 .admin-pagination .filter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.w-3\.5 { width: 0.875rem; }
+.h-3\.5 { height: 0.875rem; }
+.w-4 { width: 1rem; }
+.h-4 { height: 1rem; }
+.w-5 { width: 1.25rem; }
+.h-5 { height: 1.25rem; }
+.w-8 { width: 2rem; }
+.h-8 { height: 2rem; }
+.w-16 { width: 4rem; }
+.h-16 { height: 4rem; }
+.text-white { color: #fff; }
