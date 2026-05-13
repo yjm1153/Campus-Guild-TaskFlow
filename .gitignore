@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+dist/
+# 忽略 Java 编译产物
+server/target/
+*.class
+
+# 忽略打包后的 JS
+ui/js/bundle.js
+data/*.db
+server/data/*.db
