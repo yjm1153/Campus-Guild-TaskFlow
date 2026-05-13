@@ -279,7 +279,6 @@ function withActionLock(fn) {
   return async function(...args) {
     if (state.actionLoading) return;
     state.actionLoading = true;
-    render();
     try {
       await fn(...args);
     } finally {
@@ -290,6 +289,7 @@ function withActionLock(fn) {
 }
 
 function escapeHtml(str) {
+  if (!str) return '';
   if (typeof str !== 'string') return str;
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   return str.replace(/[&<>"']/g, c => map[c]);
@@ -405,7 +405,7 @@ function renderTaskCard(task) {
       <div class="task-card-footer">
         <div class="task-card-publisher">
           <div class="task-card-avatar gradient-campus">${initial}</div>
-          <span class="task-card-publisher-name">${escapeHtml(task.publisherNickname)}</span>
+          <span class="task-card-publisher-name">${escapeHtml(task.publisherNickname || '未知用户')}</span>
         </div>
         <div class="task-card-reward">
           ${svgIcon('M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z', 'w-4 h-4')}
@@ -934,8 +934,10 @@ async function handleUnbanUser(userId) {
 async function handleDeleteTask(taskId) {
   try {
     await apiAdmin.deleteTask(taskId);
+    state.adminTaskPage = 0;
     state.adminStats = await apiAdmin.getStats();
     await loadAdminTasks();
+    await loadTasks();
     render();
     showError('任务已删除', 'admin-message');
   } catch (e) { showError(e.message, 'admin-message'); }
@@ -1128,6 +1130,13 @@ handlePublish = withActionLock(handlePublish);
 handleBanUser = withActionLock(handleBanUser);
 handleUnbanUser = withActionLock(handleUnbanUser);
 handleDeleteTask = withActionLock(handleDeleteTask);
+
+window.handleLogin = handleLogin;
+window.handleRegister = handleRegister;
+window.handlePublish = handlePublish;
+window.debouncedLoadTasks = debouncedLoadTasks;
+window.loadTasks = loadTasks;
+window.state = state;
 
 document.addEventListener('DOMContentLoaded', function() {
   init();

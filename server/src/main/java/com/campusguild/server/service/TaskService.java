@@ -64,11 +64,11 @@ public class TaskService {
         Page<Task> taskPage;
 
         if (keyword != null && !keyword.isBlank()) {
-            taskPage = taskRepository.findByTitleContainingIgnoreCaseAndStatusOrderByCreatedAtDesc(keyword, TaskStatus.PENDING, pageable);
+            taskPage = taskRepository.findByTitleContainingAndStatusAndPublisherNotBanned(keyword, TaskStatus.PENDING, pageable);
         } else if (category != null && !category.isBlank()) {
-            taskPage = taskRepository.findByCategoryAndStatusOrderByCreatedAtDesc(category, TaskStatus.PENDING, pageable);
+            taskPage = taskRepository.findByCategoryAndStatusAndPublisherNotBanned(category, TaskStatus.PENDING, pageable);
         } else {
-            taskPage = taskRepository.findByStatusOrderByCreatedAtDesc(TaskStatus.PENDING, pageable);
+            taskPage = taskRepository.findPendingByPublisherNotBanned(TaskStatus.PENDING, pageable);
         }
 
         return new PageResult<>(

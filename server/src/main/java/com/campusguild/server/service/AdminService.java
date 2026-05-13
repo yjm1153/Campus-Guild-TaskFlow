@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -83,6 +84,14 @@ public class AdminService {
         }
         user.setBanned(true);
         userRepository.save(user);
+
+        List<Task> acceptedTasks = taskRepository.findByAccepterIdAndStatus(targetUserId, TaskStatus.IN_PROGRESS);
+        for (Task task : acceptedTasks) {
+            task.setAccepter(null);
+            task.setStatus(TaskStatus.PENDING);
+            task.setDeadline(java.time.LocalDateTime.now().plusDays(7));
+            taskRepository.save(task);
+        }
     }
 
     @Transactional
@@ -125,6 +134,7 @@ public class AdminService {
         }
 
         taskRepository.delete(task);
+        taskRepository.flush();
     }
 
     public Map<String, Object> getStats() {
