@@ -141,6 +141,10 @@ public class TaskService {
             throw new BusinessException("已完成任务无法取消");
         }
 
+        if (task.getStatus() == TaskStatus.CANCELLED) {
+            throw new BusinessException("任务已被取消");
+        }
+
         // 退还积分给发布者
         pointsService.refundPoints(task.getPublisher(), task.getReward());
 
