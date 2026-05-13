@@ -100,6 +100,9 @@ const apiTasks = {
   cancel(taskId) {
     return api.post(`/tasks/${taskId}/cancel`, {});
   },
+  drop(taskId) {
+    return api.post(`/tasks/${taskId}/drop`, {});
+  },
   getDetail(taskId) {
     return api.get(`/tasks/${taskId}`);
   },
@@ -147,6 +150,8 @@ function bindEvents() {
         handleCompleteTask(parseInt(el.dataset.id));
       } else if (action === 'handleCancelTask') {
         handleCancelTask(parseInt(el.dataset.id));
+      } else if (action === 'handleDropTask') {
+        handleDropTask(parseInt(el.dataset.id));
       } else if (action === 'navigate') {
         navigate(el.dataset.page);
       } else if (action === 'handleLogout') {
@@ -523,7 +528,8 @@ async function renderTaskDetailPage() {
       actionHtml = `<button class="btn-primary" data-action="handleCompleteTask" data-id="${task.id}">确认完成</button>
                     <button class="btn-secondary" data-action="handleCancelTask" data-id="${task.id}">取消任务</button>`;
     } else if (task.accepterId === state.user.id) {
-      actionHtml = `<div class="detail-progress">你已接取此任务，请尽快完成</div>`;
+      actionHtml = `<div class="detail-progress">你已接取此任务，请尽快完成</div>
+                    <button class="btn-secondary" data-action="handleDropTask" data-id="${task.id}">放弃任务</button>`;
     } else {
       actionHtml = `<div class="detail-progress">任务进行中...</div>`;
     }
@@ -1004,6 +1010,17 @@ async function handleCancelTask(taskId) {
   } catch (e) {
     render();
     showError(e.message || '取消失败', 'detail-message');
+  }
+}
+
+async function handleDropTask(taskId) {
+  try {
+    await apiTasks.drop(taskId);
+    navigate('dashboard');
+    await loadTasks();
+  } catch (e) {
+    render();
+    showError(e.message || '放弃失败', 'detail-message');
   }
 }
 

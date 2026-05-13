@@ -184,6 +184,27 @@ public class TaskService {
     }
 
     @Transactional
+    public TaskDTO dropTask(Long taskId, Long userId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("任务不存在"));
+
+        if (task.getStatus() != TaskStatus.IN_PROGRESS) {
+            throw new BusinessException("只能放弃进行中的任务");
+        }
+
+        if (task.getAccepter() == null || !task.getAccepter().getId().equals(userId)) {
+            throw new BusinessException("只有接取者可以放弃任务");
+        }
+
+        task.setAccepter(null);
+        task.setStatus(TaskStatus.PENDING);
+        task.setDeadline(java.time.LocalDateTime.now().plusDays(7));
+        task = taskRepository.save(task);
+
+        return TaskDTO.fromEntity(task);
+    }
+
+    @Transactional
     public TaskDTO incrementViews(Long taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new BusinessException("任务不存在"));

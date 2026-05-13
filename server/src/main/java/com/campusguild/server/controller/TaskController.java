@@ -64,6 +64,12 @@ public class TaskController {
         return Result.success(taskService.cancelTask(taskId, userId));
     }
 
+    @PostMapping("/{taskId}/drop")
+    public Result<TaskDTO> drop(@PathVariable Long taskId, HttpServletRequest request) {
+        Long userId = AuthUtil.requireUserId(request);
+        return Result.success(taskService.dropTask(taskId, userId));
+    }
+
     @GetMapping("/my/published")
     public Result<PageResult<TaskDTO>> myPublished(
             HttpServletRequest request,
