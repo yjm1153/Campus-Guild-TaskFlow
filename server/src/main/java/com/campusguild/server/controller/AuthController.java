@@ -1,5 +1,6 @@
 package com.campusguild.server.controller;
 
+import com.campusguild.server.common.AuthUtil;
 import com.campusguild.server.common.Result;
 import com.campusguild.server.config.JwtTokenProvider;
 import com.campusguild.server.model.dto.LoginRequest;
@@ -43,7 +44,7 @@ public class AuthController {
 
     @GetMapping("/me")
     public Result<UserDTO> getCurrentUser(HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(authService.getUserById(userId));
     }
 
