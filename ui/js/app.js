@@ -10,9 +10,12 @@ const state = {
   category: '',
   showUserMenu: false,
   profileTab: 'published',
+  profilePage: 0,
+  profileTotalPages: 0,
   page: 0,
   totalPages: 0,
   loading: false,
+  actionLoading: false,
   adminTab: 'users',
   adminUserPage: 0,
   adminTaskPage: 0,
@@ -88,8 +91,8 @@ const apiTasks = {
     if (category) params.append('category', category);
     return api.get(`/tasks?${params}`);
   },
-  publish(title, description, category, reward) {
-    return api.post('/tasks', { title, description, category, reward });
+  publish(title, description, category, reward, deadlineDays) {
+    return api.post('/tasks', { title, description, category, reward, deadlineDays });
   },
   accept(taskId) {
     return api.post(`/tasks/${taskId}/accept`, {});
@@ -164,6 +167,7 @@ function bindEvents() {
         setReward(parseInt(el.dataset.value));
       } else if (action === 'setProfileTab') {
         state.profileTab = el.dataset.tab;
+        state.profilePage = 0;
         render();
       } else if (action === 'setCategory') {
         state.category = el.dataset.key;
@@ -187,6 +191,9 @@ function bindEvents() {
         state.adminTaskStatus = el.dataset.status;
         state.adminTaskPage = 0;
         render();
+      } else if (action === 'setProfilePage') {
+        state.profilePage = parseInt(el.dataset.page);
+        render();
       }
     });
   });
@@ -195,7 +202,7 @@ function bindEvents() {
   if (searchInput) {
     searchInput.addEventListener('input', function() {
       state.searchQuery = this.value;
-      loadTasks();
+      debouncedLoadTasks();
     });
   }
 }
@@ -259,10 +266,49 @@ function showError(message, elementId = 'error-message') {
   }
 }
 
+var searchTimer = null;
+function debouncedLoadTasks() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.page = 0;
+    loadTasks();
+  }, 300);
+}
+
+function withActionLock(fn) {
+  return async function(...args) {
+    if (state.actionLoading) return;
+    state.actionLoading = true;
+    render();
+    try {
+      await fn(...args);
+    } finally {
+      state.actionLoading = false;
+      render();
+    }
+  };
+}
+
 function escapeHtml(str) {
   if (typeof str !== 'string') return str;
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   return str.replace(/[&<>"']/g, c => map[c]);
+}
+
+function renderPagination(currentPage, totalPages, action) {
+  if (totalPages <= 1) return '';
+  const maxVisible = 5;
+  const pages = [];
+  let start = Math.max(0, currentPage - Math.floor(maxVisible / 2));
+  let end = Math.min(totalPages, start + maxVisible);
+  if (end - start < maxVisible) start = Math.max(0, end - maxVisible);
+  for (let i = start; i < end; i++) pages.push(i);
+  return `
+    <div class="pagination">
+      <button class="pagination-btn" data-action="${action}" data-page="${currentPage - 1}" ${currentPage <= 0 ? 'disabled' : ''}>&laquo; 上一页</button>
+      ${pages.map(p => `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" data-action="${action}" data-page="${p}">${p + 1}</button>`).join('')}
+      <button class="pagination-btn" data-action="${action}" data-page="${currentPage + 1}" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>下一页 &raquo;</button>
+    </div>`;
 }
 
 function svgIcon(path, className = 'w-5 h-5') {
@@ -468,7 +514,7 @@ async function renderDashboardPage() {
           <div class="filter-bar-inner">
             <div class="search-wrapper">
               ${svgIcon('M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', 'w-5 h-5')}
-              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${escapeHtml(state.searchQuery)}" oninput="state.searchQuery=this.value;loadTasks();">
+              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${escapeHtml(state.searchQuery)}" oninput="state.searchQuery=this.value;debouncedLoadTasks();">
             </div>
             <div class="filter-buttons">
               ${filterBtns.map(btn => `
@@ -632,6 +678,10 @@ function renderPublishPage() {
                 </div>
               </div>
             </div>
+            <div>
+              <label class="publish-label">任务期限（天）</label>
+              <input type="number" id="pub-deadline" class="input-field" placeholder="默认 7 天" min="1" max="90" value="7" style="max-width:200px;">
+            </div>
             <div class="publish-actions">
               <button type="button" class="btn-secondary" data-action="navigate" data-page="dashboard">取消</button>
               <button type="submit" class="btn-primary">发布任务</button>
@@ -651,11 +701,14 @@ async function renderProfilePage() {
   const activeTab = state.profileTab || 'published';
 
   let myTasks = [];
+  let profileTotalPages = 0;
   try {
     const result = activeTab === 'published'
-      ? await apiTasks.myPublished()
-      : await apiTasks.myAccepted();
+      ? await apiTasks.myPublished(state.profilePage, 10)
+      : await apiTasks.myAccepted(state.profilePage, 10);
     myTasks = result.items || [];
+    profileTotalPages = result.totalPages || 0;
+    state.profileTotalPages = profileTotalPages;
   } catch (e) {
     console.error(e);
   }
@@ -709,6 +762,7 @@ async function renderProfilePage() {
               <div class="tasks-grid">
                 ${myTasks.map(task => renderTaskCard(task)).join('')}
               </div>
+              ${renderPagination(state.profilePage, state.profileTotalPages, 'setProfilePage')}
             ` : `
               <div class="profile-empty">暂无任务记录</div>
             `}
@@ -901,6 +955,8 @@ async function loadAdminTasks() {
 
 async function render() {
   const app = document.getElementById('app');
+  if (state.actionLoading) app.classList.add('action-loading');
+  else app.classList.remove('action-loading');
   let html = '';
   switch (state.currentPage) {
     case 'login': html = renderLoginPage(); break;
@@ -1042,10 +1098,11 @@ async function handlePublish(e) {
   const title = document.getElementById('pub-title').value;
   const description = document.getElementById('pub-desc').value;
   const reward = parseInt(document.getElementById('pub-reward').value);
+  const deadlineDays = parseInt(document.getElementById('pub-deadline').value) || 7;
   const category = state.selectedCategory || 'other';
   const errorEl = document.getElementById('publish-error');
   try {
-    await apiTasks.publish(title, description, category, reward);
+    await apiTasks.publish(title, description, category, reward, deadlineDays);
     navigate('dashboard');
     await loadTasks();
   } catch (err) {
@@ -1063,6 +1120,14 @@ function openTaskDetail(id) {
   viewTaskDetail(id);
 }
 
+handleAcceptTask = withActionLock(handleAcceptTask);
+handleCompleteTask = withActionLock(handleCompleteTask);
+handleCancelTask = withActionLock(handleCancelTask);
+handleDropTask = withActionLock(handleDropTask);
+handlePublish = withActionLock(handlePublish);
+handleBanUser = withActionLock(handleBanUser);
+handleUnbanUser = withActionLock(handleUnbanUser);
+handleDeleteTask = withActionLock(handleDeleteTask);
 
 document.addEventListener('DOMContentLoaded', function() {
   init();

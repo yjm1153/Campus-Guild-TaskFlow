@@ -339,3 +339,11 @@ a.task-card { color: inherit; }
 .w-16 { width: 4rem; }
 .h-16 { height: 4rem; }
 .text-white { color: #fff; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 0.25rem; padding: 1rem 0; }
+.pagination-btn { padding: 0.375rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); background: #fff; color: var(--gray-600); font-size: 0.875rem; cursor: pointer; transition: all 0.15s; }
+.pagination-btn:hover:not(:disabled) { background: var(--campus-50); border-color: var(--campus-300); color: var(--campus-600); }
+.pagination-btn.active { background: var(--campus-600); color: #fff; border-color: var(--campus-600); }
+.pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.action-loading button[data-action] { pointer-events: none; opacity: 0.6; }
