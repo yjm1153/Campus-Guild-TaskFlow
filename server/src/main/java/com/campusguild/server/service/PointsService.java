@@ -52,11 +52,4 @@ public class PointsService {
         userRepository.save(user);
     }
 
-    /**
-     * 查询用户信息（含积分/等级）
-     */
-    public User getUserInfo(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
-    }
 }

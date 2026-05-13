@@ -202,13 +202,8 @@ spring:
 
 ### 前端构建命令
 
-不要使用 `--bundle` 标志：
 ```bash
-# 错误（会导致函数作用域问题）
 npx esbuild js/app.js --bundle --outfile=js/bundle.js --minify
-
-# 正确
-npx esbuild js/app.js --outfile=js/bundle.js --minify
 ```
 
 ### 状态值说明

@@ -1046,11 +1046,6 @@ function openTaskDetail(id) {
   viewTaskDetail(id);
 }
 
-function doLogin() {
-  handleLogin({preventDefault: function() {}}).catch(function(err) {
-    console.error('Login error:', err);
-  });
-}
 
 document.addEventListener('DOMContentLoaded', function() {
   init();
