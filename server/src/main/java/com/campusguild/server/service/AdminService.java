@@ -98,7 +98,12 @@ public class AdminService {
         Page<Task> taskPage;
 
         if (status != null && !status.isBlank()) {
-            TaskStatus taskStatus = TaskStatus.valueOf(status);
+            TaskStatus taskStatus;
+            try {
+                taskStatus = TaskStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException("无效的任务状态: " + status);
+            }
             taskPage = taskRepository.findByStatusOrderByCreatedAtDesc(taskStatus, pageable);
         } else {
             taskPage = taskRepository.findAllByOrderByCreatedAtDesc(pageable);
