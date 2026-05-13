@@ -494,6 +494,7 @@ async function renderDashboardPage() {
 async function viewTaskDetail(taskId) {
   try {
     const task = await apiTasks.getDetail(taskId);
+    apiTasks.incrementViews(taskId).catch(() => {});
     state.currentTask = task;
     state.currentPage = 'taskDetail';
     render();
