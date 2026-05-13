@@ -20,6 +20,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     Page<Task> findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(String keyword, Pageable pageable);
 
+    Page<Task> findByTitleContainingIgnoreCaseAndStatusOrderByCreatedAtDesc(String keyword, TaskStatus status, Pageable pageable);
+
     Page<Task> findByCategoryAndStatusOrderByCreatedAtDesc(String category, TaskStatus status, Pageable pageable);
 
     Page<Task> findByPublisherIdOrderByCreatedAtDesc(Long publisherId, Pageable pageable);

@@ -111,7 +111,7 @@ class TaskServiceTest {
     @Test
     void browseTasks_ByKeyword() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(taskRepository.findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(anyString(), any(Pageable.class)))
+        when(taskRepository.findByTitleContainingIgnoreCaseAndStatusOrderByCreatedAtDesc(anyString(), eq(TaskStatus.PENDING), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(testTask), pageable, 1));
 
         PageResult<TaskDTO> result = taskService.browseTasks(0, 10, "测试", null);

@@ -64,7 +64,7 @@ public class TaskService {
         Page<Task> taskPage;
 
         if (keyword != null && !keyword.isBlank()) {
-            taskPage = taskRepository.findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(keyword, pageable);
+            taskPage = taskRepository.findByTitleContainingIgnoreCaseAndStatusOrderByCreatedAtDesc(keyword, TaskStatus.PENDING, pageable);
         } else if (category != null && !category.isBlank()) {
             taskPage = taskRepository.findByCategoryAndStatusOrderByCreatedAtDesc(category, TaskStatus.PENDING, pageable);
         } else {
