@@ -120,6 +120,8 @@ npx serve . -p 3000
 | POST | /api/tasks/{id}/accept | 接取任务 |
 | POST | /api/tasks/{id}/complete | 确认完成 |
 | POST | /api/tasks/{id}/cancel | 取消任务 |
+| POST | /api/tasks/{id}/drop | 放弃任务 |
+| POST | /api/tasks/{id}/views | 浏览次数 |
 | GET | /api/tasks/my/published | 我发布的任务 |
 | GET | /api/tasks/my/accepted | 我接取的任务 |
 | GET | /api/admin/stats | 系统统计 |
@@ -155,12 +157,16 @@ cd server
 ```
 Campus-Guild-TaskFlow/
 ├── server/                    # Spring Boot 后端
-│   └── src/main/java/...
-│       ├── config/          # 配置类
-│       ├── controller/     # REST API
-│       ├── service/       # 业务逻辑
-│       ├── model/         # 数据模型
-│       └── repository/    # 数据访问
+│   ├── src/main/java/...
+│   │   ├── config/          # 配置类
+│   │   ├── controller/     # REST API
+│   │   ├── service/       # 业务逻辑
+│   │   ├── model/         # 数据模型
+│   │   ├── repository/    # 数据访问
+│   │   ├── common/        # 公共工具
+│   │   └── exception/    # 异常处理
+│   ├── src/test/java/...    # 测试
+│   └── data/               # H2 数据库文件
 │
 ├── ui/                      # 前端
 │   ├── index.html          # 入口页面
@@ -170,8 +176,14 @@ Campus-Guild-TaskFlow/
 │   └── css/
 │       └── style.css     # 样式
 │
-├── data/                    # H2 数据库文件
-│   └── campusguild.mv.db
+├── sql/                     # 数据库脚本
+│   └── schema.sql          # 建表 DDL
+│
+├── docs/                    # 项目文档
+│   └── report/            # 结项报告
+│
+├── .github/workflows/       # CI/CD 部署
+│   └── deploy.yml
 │
 └── README.md
 ```

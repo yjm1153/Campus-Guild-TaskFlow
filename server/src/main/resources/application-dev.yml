@@ -30,7 +30,7 @@ springdoc:
   api-docs:
     path: /api-docs
   swagger-ui:
-    enabled: false
+    enabled: true
 
 logging:
   level:
