@@ -123,6 +123,9 @@ public class TaskService {
         task = taskRepository.save(task);
 
         // 结算：接单者获得赏金和经验值
+        if (task.getAccepter() == null) {
+            throw new BusinessException("任务无接取者，无法确认完成");
+        }
         pointsService.settleReward(task.getAccepter(), task.getReward());
 
         return TaskDTO.fromEntity(task);
