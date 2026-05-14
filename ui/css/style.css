@@ -96,6 +96,10 @@ img { max-width: 100%; display: block; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-16px); } }
+@keyframes navSlide { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .animate-fade-in { animation: fadeIn 0.5s ease-out; }
 .animate-slide-up { animation: slideUp 0.4s ease-out both; }
 .animate-scale-in { animation: scaleIn 0.3s ease-out; }
@@ -347,3 +351,46 @@ a.task-card { color: inherit; }
 .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .action-loading button[data-action] { pointer-events: none; opacity: 0.6; }
+
+#app { transition: opacity 0.2s ease; }
+#app.page-out { opacity: 0; }
+
+.skeleton { background: var(--gray-100); border-radius: var(--radius-xl); }
+.skeleton-card { padding: 1.5rem; margin-bottom: 1rem; border-radius: var(--radius-2xl); }
+.skeleton-line { height: 1rem; border-radius: 0.5rem; animation: pulse 1.5s ease-in-out infinite; }
+.skeleton-line:not(:last-child) { margin-bottom: 0.75rem; }
+.skeleton-line-short { width: 60%; }
+
+.tasks-grid { display: grid; gap: 1rem; }
+@media (min-width: 640px) { .tasks-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.task-card.animate-stagger { opacity: 0; animation: slideUp 0.4s ease-out forwards; }
+
+.toast-msg {
+  position: fixed; top: 1rem; left: 50%; transform: translateX(-50%);
+  padding: 0.75rem 1.5rem; border-radius: var(--radius-xl);
+  font-size: 0.875rem; font-weight: 500; z-index: 100;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.3s ease-out;
+  pointer-events: none;
+}
+.toast-msg.toast-out { animation: toastOut 0.3s ease-out forwards; }
+.toast-success { background: var(--green-50); color: var(--green-700); border: 1px solid var(--green-100); }
+.toast-error { background: var(--red-50); color: var(--red-600); border: 1px solid var(--red-100); }
+
+.navbar-nav-item { position: relative; }
+.navbar-nav-item.active::after {
+  content: '';
+  position: absolute; bottom: -2px; left: 12px; right: 12px; height: 2px;
+  background: var(--campus-600); border-radius: 1px;
+  animation: navSlide 0.3s ease-out;
+  transform-origin: left;
+}
+
+button, .btn-primary, .btn-secondary, .btn-success, .pagination-btn, .filter-btn, .task-card-btn {
+  transition: all 0.15s ease;
+}
+button:active:not(:disabled), .btn-primary:active:not(:disabled), .btn-secondary:active:not(:disabled),
+.btn-success:active:not(:disabled), .filter-btn:active:not(:disabled), .task-card-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}

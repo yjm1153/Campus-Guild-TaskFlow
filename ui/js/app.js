@@ -257,13 +257,28 @@ async function loadTasks() {
   }
 }
 
-function showError(message, elementId = 'error-message') {
-  const el = document.getElementById(elementId);
-  if (el) {
-    el.textContent = message;
-    el.style.display = 'block';
-    setTimeout(() => el.style.display = 'none', 3000);
+var toastTimer = null;
+
+function showError(message, elementId = 'error-message', isSuccess = false) {
+  if (elementId !== 'error-message' && elementId !== 'detail-message' && elementId !== 'admin-message') {
+    var el = document.getElementById(elementId);
+    if (el) { el.textContent = message; el.style.display = 'block'; setTimeout(function() { el.style.display = 'none'; }, 3000); }
+    return;
   }
+  showToast(message, isSuccess);
+}
+
+function showToast(message, isSuccess) {
+  var existing = document.querySelector('.toast-msg');
+  if (existing) { existing.remove(); clearTimeout(toastTimer); }
+  var toast = document.createElement('div');
+  toast.className = 'toast-msg ' + (isSuccess ? 'toast-success' : 'toast-error');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  toastTimer = setTimeout(function() {
+    toast.classList.add('toast-out');
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+  }, 2500);
 }
 
 var searchTimer = null;
@@ -392,11 +407,12 @@ function renderNavbar() {
   `;
 }
 
-function renderTaskCard(task) {
+function renderTaskCard(task, idx) {
   const status = statusConfig[task.status] || statusConfig['待接取'];
   const initial = escapeHtml(task.publisherNickname?.charAt(0).toUpperCase() || 'U');
+  const delay = idx !== undefined ? `style="animation-delay:${idx * 0.06}s"` : '';
   return `
-    <div class="task-card card animate-slide-up">
+    <div class="task-card card animate-stagger" ${delay}>
       <div class="task-card-header">
         <h3 class="task-card-title">${escapeHtml(task.title)}</h3>
         <span class="badge ${status.className}">${status.label}</span>
@@ -524,12 +540,15 @@ async function renderDashboardPage() {
           </div>
         </div>
         ${state.loading ? `
-          <div class="card empty-state">
-            <p>加载中...</p>
+          <div class="skeleton-card card">
+            <div class="skeleton skeleton-line" style="width:70%;"></div>
+            <div class="skeleton skeleton-line" style="width:40%;"></div>
+            <div class="skeleton skeleton-line" style="width:100%;margin-top:1.5rem;"></div>
+            <div class="skeleton skeleton-line" style="width:80%;"></div>
           </div>
         ` : state.tasks.length > 0 ? `
           <div class="tasks-grid">
-            ${state.tasks.map((task, i) => renderTaskCard(task)).join('')}
+            ${state.tasks.map((task, i) => renderTaskCard(task, i)).join('')}
           </div>
         ` : `
           <div class="card empty-state">
@@ -760,7 +779,7 @@ async function renderProfilePage() {
           <div class="profile-tab-content">
             ${myTasks.length > 0 ? `
               <div class="tasks-grid">
-                ${myTasks.map(task => renderTaskCard(task)).join('')}
+                ${myTasks.map((task, i) => renderTaskCard(task, i)).join('')}
               </div>
               ${renderPagination(state.profilePage, state.profileTotalPages, 'setProfilePage')}
             ` : `
@@ -918,7 +937,7 @@ async function handleBanUser(userId) {
     await apiAdmin.banUser(userId);
     await loadAdminUsers();
     render();
-    showError('用户已封禁', 'admin-message');
+    showError('用户已封禁', 'admin-message', true);
   } catch (e) { showError(e.message, 'admin-message'); }
 }
 
@@ -927,7 +946,7 @@ async function handleUnbanUser(userId) {
     await apiAdmin.unbanUser(userId);
     await loadAdminUsers();
     render();
-    showError('用户已解封', 'admin-message');
+    showError('用户已解封', 'admin-message', true);
   } catch (e) { showError(e.message, 'admin-message'); }
 }
 
@@ -939,7 +958,7 @@ async function handleDeleteTask(taskId) {
     await loadAdminTasks();
     await loadTasks();
     render();
-    showError('任务已删除', 'admin-message');
+    showError('任务已删除', 'admin-message', true);
   } catch (e) { showError(e.message, 'admin-message'); }
 }
 
@@ -970,7 +989,10 @@ async function render() {
     case 'admin': html = await renderAdminPage(); break;
     default: html = renderLoginPage();
   }
+  app.classList.add('page-out');
+  await new Promise(r => setTimeout(r, 150));
   app.innerHTML = html;
+  app.classList.remove('page-out');
   window.scrollTo(0, 0);
   bindEvents();
 }
@@ -1035,7 +1057,7 @@ async function handleAcceptTask(taskId) {
     await apiTasks.accept(taskId);
     state.currentTask = await apiTasks.getDetail(taskId);
     render();
-    showError('接取成功！', 'detail-message');
+    showError('接取成功！', 'detail-message', true);
   } catch (e) {
     render();
     showError(e.message || '接取失败', 'detail-message');
@@ -1046,11 +1068,10 @@ async function handleCompleteTask(taskId) {
   try {
     await apiTasks.complete(taskId);
     state.currentTask = await apiTasks.getDetail(taskId);
-    // 刷新用户信息（积分变动）
-    const me = await api.get('/auth/me');
+    var me = await api.get('/auth/me');
     saveUser(me, state.token);
     render();
-    showError('任务已完成，积分已结算！', 'detail-message');
+    showError('任务已完成，积分已结算！', 'detail-message', true);
   } catch (e) {
     render();
     showError(e.message || '操作失败', 'detail-message');
