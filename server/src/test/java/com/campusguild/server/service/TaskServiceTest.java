@@ -111,7 +111,7 @@ class TaskServiceTest {
     @Test
     void browseTasks_ByKeyword() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(taskRepository.findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(anyString(), any(Pageable.class)))
+        when(taskRepository.findByTitleContainingAndStatusAndPublisherNotBanned(eq("测试"), eq(TaskStatus.PENDING), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(testTask), pageable, 1));
 
         PageResult<TaskDTO> result = taskService.browseTasks(0, 10, "测试", null);
@@ -123,7 +123,7 @@ class TaskServiceTest {
     @Test
     void browseTasks_ByCategory() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(taskRepository.findByCategoryAndStatusOrderByCreatedAtDesc(eq("跑腿"), eq(TaskStatus.PENDING), any(Pageable.class)))
+        when(taskRepository.findByCategoryAndStatusAndPublisherNotBanned(eq("跑腿"), eq(TaskStatus.PENDING), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(testTask), pageable, 1));
 
         PageResult<TaskDTO> result = taskService.browseTasks(0, 10, null, "跑腿");

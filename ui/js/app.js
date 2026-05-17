@@ -10,9 +10,12 @@ const state = {
   category: '',
   showUserMenu: false,
   profileTab: 'published',
+  profilePage: 0,
+  profileTotalPages: 0,
   page: 0,
   totalPages: 0,
   loading: false,
+  actionLoading: false,
   adminTab: 'users',
   adminUserPage: 0,
   adminTaskPage: 0,
@@ -21,6 +24,75 @@ const state = {
   adminTasksData: { items: [], totalPages: 0 },
   adminStats: null,
 };
+
+var particlesCanvas = null;
+var particlesCtx = null;
+var particlesArray = [];
+var particleAnimationId = null;
+
+function initParticles() {
+  particlesCanvas = document.getElementById('particles-canvas');
+  if (!particlesCanvas) return;
+  particlesCtx = particlesCanvas.getContext('2d');
+  particlesCanvas.width = window.innerWidth;
+  particlesCanvas.height = window.innerHeight;
+  particlesArray = [];
+  for (var i = 0; i < 40; i++) {
+    particlesArray.push({
+      x: Math.random() * particlesCanvas.width,
+      y: Math.random() * particlesCanvas.height,
+      r: Math.random() * 2 + 0.5,
+      dx: (Math.random() - 0.5) * 0.4,
+      dy: (Math.random() - 0.5) * 0.4,
+      alpha: Math.random() * 0.4 + 0.1
+    });
+  }
+  if (particleAnimationId) cancelAnimationFrame(particleAnimationId);
+  animateParticles();
+}
+
+function animateParticles() {
+  if (!particlesCtx || !particlesCanvas) return;
+  particlesCtx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
+  for (var i = 0; i < particlesArray.length; i++) {
+    var p = particlesArray[i];
+    p.x += p.dx; p.y += p.dy;
+    if (p.x < 0) p.x = particlesCanvas.width;
+    if (p.x > particlesCanvas.width) p.x = 0;
+    if (p.y < 0) p.y = particlesCanvas.height;
+    if (p.y > particlesCanvas.height) p.y = 0;
+    particlesCtx.beginPath();
+    particlesCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    particlesCtx.fillStyle = 'rgba(14,165,233,' + p.alpha + ')';
+    particlesCtx.fill();
+    for (var j = i + 1; j < particlesArray.length; j++) {
+      var p2 = particlesArray[j];
+      var dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+      if (dist < 120) {
+        particlesCtx.beginPath();
+        particlesCtx.moveTo(p.x, p.y);
+        particlesCtx.lineTo(p2.x, p2.y);
+        particlesCtx.strokeStyle = 'rgba(14,165,233,' + (0.06 * (1 - dist / 120)) + ')';
+        particlesCtx.stroke();
+      }
+    }
+  }
+  particleAnimationId = requestAnimationFrame(animateParticles);
+}
+
+function stopParticles() {
+  if (particleAnimationId) cancelAnimationFrame(particleAnimationId);
+  particleAnimationId = null;
+}
+
+var progressBar = null;
+function updateProgressBar() {
+  if (!progressBar) return;
+  var scrollTop = window.scrollY || document.documentElement.scrollTop;
+  var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  var percent = docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0;
+  progressBar.style.width = percent + '%';
+}
 
 const api = {
   async request(endpoint, options = {}) {
@@ -88,8 +160,8 @@ const apiTasks = {
     if (category) params.append('category', category);
     return api.get(`/tasks?${params}`);
   },
-  publish(title, description, category, reward) {
-    return api.post('/tasks', { title, description, category, reward });
+  publish(title, description, category, reward, deadlineDays) {
+    return api.post('/tasks', { title, description, category, reward, deadlineDays });
   },
   accept(taskId) {
     return api.post(`/tasks/${taskId}/accept`, {});
@@ -99,6 +171,9 @@ const apiTasks = {
   },
   cancel(taskId) {
     return api.post(`/tasks/${taskId}/cancel`, {});
+  },
+  drop(taskId) {
+    return api.post(`/tasks/${taskId}/drop`, {});
   },
   getDetail(taskId) {
     return api.get(`/tasks/${taskId}`);
@@ -147,6 +222,8 @@ function bindEvents() {
         handleCompleteTask(parseInt(el.dataset.id));
       } else if (action === 'handleCancelTask') {
         handleCancelTask(parseInt(el.dataset.id));
+      } else if (action === 'handleDropTask') {
+        handleDropTask(parseInt(el.dataset.id));
       } else if (action === 'navigate') {
         navigate(el.dataset.page);
       } else if (action === 'handleLogout') {
@@ -159,6 +236,7 @@ function bindEvents() {
         setReward(parseInt(el.dataset.value));
       } else if (action === 'setProfileTab') {
         state.profileTab = el.dataset.tab;
+        state.profilePage = 0;
         render();
       } else if (action === 'setCategory') {
         state.category = el.dataset.key;
@@ -182,6 +260,9 @@ function bindEvents() {
         state.adminTaskStatus = el.dataset.status;
         state.adminTaskPage = 0;
         render();
+      } else if (action === 'setProfilePage') {
+        state.profilePage = parseInt(el.dataset.page);
+        render();
       }
     });
   });
@@ -190,7 +271,7 @@ function bindEvents() {
   if (searchInput) {
     searchInput.addEventListener('input', function() {
       state.searchQuery = this.value;
-      loadTasks();
+      debouncedLoadTasks();
     });
   }
 }
@@ -245,19 +326,90 @@ async function loadTasks() {
   }
 }
 
-function showError(message, elementId = 'error-message') {
-  const el = document.getElementById(elementId);
-  if (el) {
-    el.textContent = message;
-    el.style.display = 'block';
-    setTimeout(() => el.style.display = 'none', 3000);
+var toastTimer = null;
+
+function showError(message, elementId = 'error-message', isSuccess = false) {
+  if (elementId !== 'error-message' && elementId !== 'detail-message' && elementId !== 'admin-message') {
+    var el = document.getElementById(elementId);
+    if (el) { el.textContent = message; el.style.display = 'block'; setTimeout(function() { el.style.display = 'none'; }, 3000); }
+    return;
   }
+  showToast(message, isSuccess);
+}
+
+function showToast(message, isSuccess) {
+  var existing = document.querySelector('.toast-msg');
+  if (existing) { existing.remove(); clearTimeout(toastTimer); }
+  var toast = document.createElement('div');
+  toast.className = 'toast-msg ' + (isSuccess ? 'toast-success' : 'toast-error');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  toastTimer = setTimeout(function() {
+    toast.classList.add('toast-out');
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+  }, 2500);
+}
+
+var searchTimer = null;
+function debouncedLoadTasks() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.page = 0;
+    loadTasks();
+  }, 300);
+}
+
+function updateCharCount() {
+  var el = document.getElementById('pub-desc');
+  var counter = document.querySelector('.publish-char-count');
+  if (el && counter) counter.textContent = (el.value || '').length + ' 字';
+}
+
+function animateCountUp(el, end) {
+  var start = 0;
+  var duration = 600;
+  var step = Math.ceil(end / (duration / 16));
+  var timer = setInterval(function() {
+    start = Math.min(start + step, end);
+    el.textContent = start;
+    if (start >= end) { clearInterval(timer); el.textContent = end; }
+  }, 16);
+}
+
+function withActionLock(fn) {
+  return async function(...args) {
+    if (state.actionLoading) return;
+    state.actionLoading = true;
+    try {
+      await fn(...args);
+    } finally {
+      state.actionLoading = false;
+      render();
+    }
+  };
 }
 
 function escapeHtml(str) {
+  if (!str) return '';
   if (typeof str !== 'string') return str;
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   return str.replace(/[&<>"']/g, c => map[c]);
+}
+
+function renderPagination(currentPage, totalPages, action) {
+  if (totalPages <= 1) return '';
+  const maxVisible = 5;
+  const pages = [];
+  let start = Math.max(0, currentPage - Math.floor(maxVisible / 2));
+  let end = Math.min(totalPages, start + maxVisible);
+  if (end - start < maxVisible) start = Math.max(0, end - maxVisible);
+  for (let i = start; i < end; i++) pages.push(i);
+  return `
+    <div class="pagination">
+      <button class="pagination-btn" data-action="${action}" data-page="${currentPage - 1}" ${currentPage <= 0 ? 'disabled' : ''}>&laquo; 上一页</button>
+      ${pages.map(p => `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" data-action="${action}" data-page="${p}">${p + 1}</button>`).join('')}
+      <button class="pagination-btn" data-action="${action}" data-page="${currentPage + 1}" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>下一页 &raquo;</button>
+    </div>`;
 }
 
 function svgIcon(path, className = 'w-5 h-5') {
@@ -341,11 +493,12 @@ function renderNavbar() {
   `;
 }
 
-function renderTaskCard(task) {
+function renderTaskCard(task, idx) {
   const status = statusConfig[task.status] || statusConfig['待接取'];
   const initial = escapeHtml(task.publisherNickname?.charAt(0).toUpperCase() || 'U');
+  const delay = idx !== undefined ? `style="animation-delay:${idx * 0.06}s"` : '';
   return `
-    <div class="task-card card animate-slide-up">
+    <div class="task-card card animate-stagger" ${delay}>
       <div class="task-card-header">
         <h3 class="task-card-title">${escapeHtml(task.title)}</h3>
         <span class="badge ${status.className}">${status.label}</span>
@@ -354,7 +507,7 @@ function renderTaskCard(task) {
       <div class="task-card-footer">
         <div class="task-card-publisher">
           <div class="task-card-avatar gradient-campus">${initial}</div>
-          <span class="task-card-publisher-name">${escapeHtml(task.publisherNickname)}</span>
+          <span class="task-card-publisher-name">${escapeHtml(task.publisherNickname || '未知用户')}</span>
         </div>
         <div class="task-card-reward">
           ${svgIcon('M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z', 'w-4 h-4')}
@@ -373,6 +526,7 @@ function renderTaskCard(task) {
 function renderLoginPage() {
   return `
     <div class="login-page gradient-subtle">
+      <canvas id="particles-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
       <div class="login-container">
         <div class="login-header animate-fade-in">
           <div class="login-header-icon gradient-campus">${svgIcon('M13 10V3L4 14h7v7l9-11h-7z', 'w-8 h-8')}</div>
@@ -405,6 +559,7 @@ function renderLoginPage() {
 function renderRegisterPage() {
   return `
     <div class="login-page gradient-subtle">
+      <canvas id="particles-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
       <div class="login-container">
         <div class="login-header animate-fade-in">
           <div class="login-header-icon gradient-campus">${svgIcon('M13 10V3L4 14h7v7l9-11h-7z', 'w-8 h-8')}</div>
@@ -463,7 +618,7 @@ async function renderDashboardPage() {
           <div class="filter-bar-inner">
             <div class="search-wrapper">
               ${svgIcon('M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', 'w-5 h-5')}
-              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${escapeHtml(state.searchQuery)}" oninput="state.searchQuery=this.value;loadTasks();">
+              <input type="text" class="input-field search-input" placeholder="搜索任务..." value="${escapeHtml(state.searchQuery)}" oninput="state.searchQuery=this.value;debouncedLoadTasks();">
             </div>
             <div class="filter-buttons">
               ${filterBtns.map(btn => `
@@ -473,17 +628,21 @@ async function renderDashboardPage() {
           </div>
         </div>
         ${state.loading ? `
-          <div class="card empty-state">
-            <p>加载中...</p>
+          <div class="skeleton-card card">
+            <div class="skeleton skeleton-line" style="width:70%;"></div>
+            <div class="skeleton skeleton-line" style="width:40%;"></div>
+            <div class="skeleton skeleton-line" style="width:100%;margin-top:1.5rem;"></div>
+            <div class="skeleton skeleton-line" style="width:80%;"></div>
           </div>
         ` : state.tasks.length > 0 ? `
           <div class="tasks-grid">
-            ${state.tasks.map((task, i) => renderTaskCard(task)).join('')}
+            ${state.tasks.map((task, i) => renderTaskCard(task, i)).join('')}
           </div>
         ` : `
           <div class="card empty-state">
-            ${svgIcon('M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', 'w-16 h-16')}
+            <div class="empty-state-icon">${svgIcon('M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4')}</div>
             <p>暂无匹配的任务</p>
+            <p>尝试调整筛选条件或发布一个新的悬赏吧</p>
           </div>
         `}
       </div>
@@ -494,6 +653,7 @@ async function renderDashboardPage() {
 async function viewTaskDetail(taskId) {
   try {
     const task = await apiTasks.getDetail(taskId);
+    apiTasks.incrementViews(taskId).catch(() => {});
     state.currentTask = task;
     state.currentPage = 'taskDetail';
     render();
@@ -522,7 +682,8 @@ async function renderTaskDetailPage() {
       actionHtml = `<button class="btn-primary" data-action="handleCompleteTask" data-id="${task.id}">确认完成</button>
                     <button class="btn-secondary" data-action="handleCancelTask" data-id="${task.id}">取消任务</button>`;
     } else if (task.accepterId === state.user.id) {
-      actionHtml = `<div class="detail-progress">你已接取此任务，请尽快完成</div>`;
+      actionHtml = `<div class="detail-progress">你已接取此任务，请尽快完成</div>
+                    <button class="btn-secondary" data-action="handleDropTask" data-id="${task.id}">放弃任务</button>`;
     } else {
       actionHtml = `<div class="detail-progress">任务进行中...</div>`;
     }
@@ -565,12 +726,12 @@ async function renderTaskDetailPage() {
               </div>
             </div>
           </div>
-          <div class="detail-section">
+          <div class="detail-section detail-section-actions">
             <div class="detail-actions">
               ${actionHtml}
             </div>
           </div>
-        </div>
+          </div>
       </div>
     </div>
   `;
@@ -600,7 +761,6 @@ function renderPublishPage() {
               <input type="text" id="pub-title" class="input-field" placeholder="简要描述你的任务" required>
             </div>
             <div>
-              <label class="publish-label">任务分类</label>
               <div class="publish-categories">
                 ${categories.map(cat => `
                   <button type="button" class="publish-category-btn" data-action="selectCategory" data-category="${cat.value}">
@@ -611,10 +771,15 @@ function renderPublishPage() {
             </div>
             <div>
               <label class="publish-label">详细描述</label>
-              <textarea id="pub-desc" class="input-field publish-textarea" placeholder="详细描述任务内容、要求、时间地点等信息"></textarea>
+              <textarea id="pub-desc" class="input-field publish-textarea" placeholder="详细描述任务内容、要求、时间地点等信息" oninput="updateCharCount()"></textarea>
+              <div class="publish-feedback"><span class="publish-char-count">0 字</span></div>
             </div>
             <div>
               <label class="publish-label">悬赏积分</label>
+              <div class="publish-points-info">
+                <span>当前余额</span>
+                <span style="font-weight:700;">${state.user?.points || 0} 积分</span>
+              </div>
               <div class="publish-reward-row">
                 <input type="number" id="pub-reward" class="input-field publish-reward-input" placeholder="10" min="1" required>
                 <span class="publish-reward-label">积分</span>
@@ -624,6 +789,10 @@ function renderPublishPage() {
                   <button type="button" class="publish-reward-preset" data-action="setReward" data-value="50">50</button>
                 </div>
               </div>
+            </div>
+            <div>
+              <label class="publish-label">任务期限（天）</label>
+              <input type="number" id="pub-deadline" class="input-field" placeholder="默认 7 天" min="1" max="90" value="7" style="max-width:200px;">
             </div>
             <div class="publish-actions">
               <button type="button" class="btn-secondary" data-action="navigate" data-page="dashboard">取消</button>
@@ -644,11 +813,14 @@ async function renderProfilePage() {
   const activeTab = state.profileTab || 'published';
 
   let myTasks = [];
+  let profileTotalPages = 0;
   try {
     const result = activeTab === 'published'
-      ? await apiTasks.myPublished()
-      : await apiTasks.myAccepted();
+      ? await apiTasks.myPublished(state.profilePage, 10)
+      : await apiTasks.myAccepted(state.profilePage, 10);
     myTasks = result.items || [];
+    profileTotalPages = result.totalPages || 0;
+    state.profileTotalPages = profileTotalPages;
   } catch (e) {
     console.error(e);
   }
@@ -700,10 +872,14 @@ async function renderProfilePage() {
           <div class="profile-tab-content">
             ${myTasks.length > 0 ? `
               <div class="tasks-grid">
-                ${myTasks.map(task => renderTaskCard(task)).join('')}
+                ${myTasks.map((task, i) => renderTaskCard(task, i)).join('')}
               </div>
+              ${renderPagination(state.profilePage, state.profileTotalPages, 'setProfilePage')}
             ` : `
-              <div class="profile-empty">暂无任务记录</div>
+              <div class="empty-state" style="padding:2rem;">
+                <div class="empty-state-icon">${svgIcon('M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z')}</div>
+                <p>暂无任务记录</p>
+              </div>
             `}
           </div>
         </div>
@@ -824,7 +1000,7 @@ async function renderAdminPage() {
             <div class="stat-card card">
               <div class="stat-icon" style="background:${c.bg}">${svgIcon(c.icon)}</div>
               <div>
-                <div class="stat-value">${stats[c.key] ?? '-'}</div>
+                <div class="stat-value" data-count="${stats[c.key] ?? 0}">${stats[c.key] ?? '-'}</div>
                 <div class="stat-label">${c.label}</div>
               </div>
             </div>
@@ -857,7 +1033,7 @@ async function handleBanUser(userId) {
     await apiAdmin.banUser(userId);
     await loadAdminUsers();
     render();
-    showError('用户已封禁', 'admin-message');
+    showError('用户已封禁', 'admin-message', true);
   } catch (e) { showError(e.message, 'admin-message'); }
 }
 
@@ -866,17 +1042,19 @@ async function handleUnbanUser(userId) {
     await apiAdmin.unbanUser(userId);
     await loadAdminUsers();
     render();
-    showError('用户已解封', 'admin-message');
+    showError('用户已解封', 'admin-message', true);
   } catch (e) { showError(e.message, 'admin-message'); }
 }
 
 async function handleDeleteTask(taskId) {
   try {
     await apiAdmin.deleteTask(taskId);
+    state.adminTaskPage = 0;
     state.adminStats = await apiAdmin.getStats();
     await loadAdminTasks();
+    await loadTasks();
     render();
-    showError('任务已删除', 'admin-message');
+    showError('任务已删除', 'admin-message', true);
   } catch (e) { showError(e.message, 'admin-message'); }
 }
 
@@ -894,6 +1072,8 @@ async function loadAdminTasks() {
 
 async function render() {
   const app = document.getElementById('app');
+  if (state.actionLoading) app.classList.add('action-loading');
+  else app.classList.remove('action-loading');
   let html = '';
   switch (state.currentPage) {
     case 'login': html = renderLoginPage(); break;
@@ -905,9 +1085,28 @@ async function render() {
     case 'admin': html = await renderAdminPage(); break;
     default: html = renderLoginPage();
   }
-  app.innerHTML = html;
+  app.classList.add('page-out');
+  await new Promise(r => setTimeout(r, 150));
+  app.innerHTML = '<div id="progress-bar" style="position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--campus-500),var(--leaf-500));z-index:100;width:0;transition:width 0.15s;"></div>' + html;
+  app.classList.remove('page-out');
   window.scrollTo(0, 0);
+  progressBar = document.getElementById('progress-bar');
+  updateProgressBar();
   bindEvents();
+  if (state.currentPage === 'admin') {
+    setTimeout(function() {
+      document.querySelectorAll('.stat-value[data-count]').forEach(function(el) {
+        var v = parseInt(el.dataset.count) || 0;
+        animateCountUp(el, v);
+      });
+    }, 200);
+  }
+  if (state.currentPage === 'login' || state.currentPage === 'register') {
+    stopParticles();
+    setTimeout(function() { initParticles(); }, 100);
+  } else {
+    stopParticles();
+  }
 }
 
 async function handleLogin(e) {
@@ -970,7 +1169,7 @@ async function handleAcceptTask(taskId) {
     await apiTasks.accept(taskId);
     state.currentTask = await apiTasks.getDetail(taskId);
     render();
-    showError('接取成功！', 'detail-message');
+    showError('接取成功！', 'detail-message', true);
   } catch (e) {
     render();
     showError(e.message || '接取失败', 'detail-message');
@@ -981,11 +1180,10 @@ async function handleCompleteTask(taskId) {
   try {
     await apiTasks.complete(taskId);
     state.currentTask = await apiTasks.getDetail(taskId);
-    // 刷新用户信息（积分变动）
-    const me = await api.get('/auth/me');
+    var me = await api.get('/auth/me');
     saveUser(me, state.token);
     render();
-    showError('任务已完成，积分已结算！', 'detail-message');
+    showError('任务已完成，积分已结算！', 'detail-message', true);
   } catch (e) {
     render();
     showError(e.message || '操作失败', 'detail-message');
@@ -1003,6 +1201,17 @@ async function handleCancelTask(taskId) {
   } catch (e) {
     render();
     showError(e.message || '取消失败', 'detail-message');
+  }
+}
+
+async function handleDropTask(taskId) {
+  try {
+    await apiTasks.drop(taskId);
+    navigate('dashboard');
+    await loadTasks();
+  } catch (e) {
+    render();
+    showError(e.message || '放弃失败', 'detail-message');
   }
 }
 
@@ -1024,10 +1233,11 @@ async function handlePublish(e) {
   const title = document.getElementById('pub-title').value;
   const description = document.getElementById('pub-desc').value;
   const reward = parseInt(document.getElementById('pub-reward').value);
+  const deadlineDays = parseInt(document.getElementById('pub-deadline').value) || 7;
   const category = state.selectedCategory || 'other';
   const errorEl = document.getElementById('publish-error');
   try {
-    await apiTasks.publish(title, description, category, reward);
+    await apiTasks.publish(title, description, category, reward, deadlineDays);
     navigate('dashboard');
     await loadTasks();
   } catch (err) {
@@ -1045,11 +1255,24 @@ function openTaskDetail(id) {
   viewTaskDetail(id);
 }
 
-function doLogin() {
-  handleLogin({preventDefault: function() {}}).catch(function(err) {
-    console.error('Login error:', err);
-  });
-}
+handleAcceptTask = withActionLock(handleAcceptTask);
+handleCompleteTask = withActionLock(handleCompleteTask);
+handleCancelTask = withActionLock(handleCancelTask);
+handleDropTask = withActionLock(handleDropTask);
+handlePublish = withActionLock(handlePublish);
+handleBanUser = withActionLock(handleBanUser);
+handleUnbanUser = withActionLock(handleUnbanUser);
+handleDeleteTask = withActionLock(handleDeleteTask);
+
+window.handleLogin = handleLogin;
+window.handleRegister = handleRegister;
+window.handlePublish = handlePublish;
+window.debouncedLoadTasks = debouncedLoadTasks;
+window.loadTasks = loadTasks;
+window.updateCharCount = updateCharCount;
+window.state = state;
+
+window.addEventListener('scroll', updateProgressBar, { passive: true });
 
 document.addEventListener('DOMContentLoaded', function() {
   init();

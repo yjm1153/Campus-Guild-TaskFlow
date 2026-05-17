@@ -20,16 +20,31 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     Page<Task> findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(String keyword, Pageable pageable);
 
+    Page<Task> findByTitleContainingIgnoreCaseAndStatusOrderByCreatedAtDesc(String keyword, TaskStatus status, Pageable pageable);
+
     Page<Task> findByCategoryAndStatusOrderByCreatedAtDesc(String category, TaskStatus status, Pageable pageable);
 
     Page<Task> findByPublisherIdOrderByCreatedAtDesc(Long publisherId, Pageable pageable);
 
     Page<Task> findByAccepterIdOrderByCreatedAtDesc(Long accepterId, Pageable pageable);
 
+    List<Task> findByPublisherIdAndStatusIn(Long publisherId, List<TaskStatus> statuses);
+
+    List<Task> findByAccepterIdAndStatus(Long accepterId, TaskStatus status);
+
     @Query("SELECT t FROM Task t WHERE t.status = :status AND t.deadline < :deadline")
     List<Task> findExpiredTasks(TaskStatus status, java.time.LocalDateTime deadline);
 
     Page<Task> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Query("SELECT t FROM Task t JOIN t.publisher p WHERE t.status = :status AND p.banned = false ORDER BY t.createdAt DESC")
+    Page<Task> findPendingByPublisherNotBanned(@Param("status") TaskStatus status, Pageable pageable);
+
+    @Query("SELECT t FROM Task t JOIN t.publisher p WHERE t.title LIKE %:keyword% AND t.status = :status AND p.banned = false ORDER BY t.createdAt DESC")
+    Page<Task> findByTitleContainingAndStatusAndPublisherNotBanned(@Param("keyword") String keyword, @Param("status") TaskStatus status, Pageable pageable);
+
+    @Query("SELECT t FROM Task t JOIN t.publisher p WHERE t.category = :category AND t.status = :status AND p.banned = false ORDER BY t.createdAt DESC")
+    Page<Task> findByCategoryAndStatusAndPublisherNotBanned(@Param("category") String category, @Param("status") TaskStatus status, Pageable pageable);
 
     long countByStatus(TaskStatus status);
 

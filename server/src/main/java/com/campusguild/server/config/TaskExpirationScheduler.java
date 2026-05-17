@@ -29,13 +29,27 @@ public class TaskExpirationScheduler {
     @Scheduled(cron = "0 0 * * * ?")
     @Transactional
     public void checkExpiredTasks() {
-        List<Task> expiredTasks = taskRepository.findExpiredTasks(
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Task> expiredInProgress = taskRepository.findExpiredTasks(
                 TaskStatus.IN_PROGRESS,
-                LocalDateTime.now()
+                now
         );
 
-        for (Task task : expiredTasks) {
+        for (Task task : expiredInProgress) {
             logger.info("任务 {} 超时未完成，已自动取消", task.getId());
+            pointsService.refundPoints(task.getPublisher(), task.getReward());
+            task.setStatus(TaskStatus.CANCELLED);
+            taskRepository.save(task);
+        }
+
+        List<Task> expiredPending = taskRepository.findExpiredTasks(
+                TaskStatus.PENDING,
+                now
+        );
+
+        for (Task task : expiredPending) {
+            logger.info("任务 {} 过期无人接取，已自动取消", task.getId());
             pointsService.refundPoints(task.getPublisher(), task.getReward());
             task.setStatus(TaskStatus.CANCELLED);
             taskRepository.save(task);

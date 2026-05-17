@@ -45,10 +45,12 @@ export JWT_SECRET=your_base64_secret_key_here
 
 ### 2. 启动前端
 
+本地开发直接打开 `ui/index.html` 即可，无需构建。
+
+生产部署时构建 JS bundle：
 ```bash
-# 构建 JS bundle
 cd ui
-npx esbuild js/app.js --outfile=js/bundle.js --minify
+npx esbuild js/app.js --bundle --outfile=js/bundle.js --minify
 
 # 启动静态服务器
 npx serve . -p 3000
@@ -74,19 +76,22 @@ npx serve . -p 3000
 - 分页加载
 
 ### 任务详情
-- 查看任务信息（标题、描述、分类、悬赏、发布者）
+- 查看任务信息（标题、描述、分类、悬赏、发布者、截止时间）
 - 接取任务（仅非发布者）
 - 确认完成（仅发布者）
-- 取消任务（仅发布者，可退还积分）
+- 取消任务（仅发布者，退还积分）
+- 放弃任务（接取者主动退出，任务回到待接取）
 
 ### 发布悬赏
-- 填写任务信息（标题、描述、分类、悬赏积分）
-- 发布时扣除积分
-- 等待他人接取
+- 填写任务信息（标题、分类、描述、悬赏积分、任务期限）
+- 实时显示当前积分余额
+- 积分快捷预设（10/20/50）
+- 发布时扣除积分，等待他人接取
 
 ### 个人中心
-- 查看我发布的任务
-- 查看我接取的任务
+- 查看我发布的任务（分页）
+- 查看我接取的任务（分页）
+- 积分、经验值、冒险者等级进度展示
 
 ### 管理员功能
 - 系统统计面板（用户总数、任务总数、各状态任务数量）
@@ -98,13 +103,17 @@ npx serve . -p 3000
 
 ```
 待接取 → (有人接取) → 进行中 → (确认完成) → 已完成
-                ↘ (取消) → 已取消
+    │                     │
+    └── (取消) → 已取消    └── (放弃) → 待接取
+                   └── (取消) → 已取消
 ```
 
 积分规则：
 - 发布任务：扣除悬赏积分
-- 完成任务：积分转给接取者
+- 完成任务：积分转给接取者，接取者获得经验值升级
 - 取消任务：积分退还给发布者
+- 接取者放弃：无积分变动，任务回到待接取
+- 封禁用户时：其接取的进行中任务自动释放
 
 ## API 接口
 
@@ -120,6 +129,8 @@ npx serve . -p 3000
 | POST | /api/tasks/{id}/accept | 接取任务 |
 | POST | /api/tasks/{id}/complete | 确认完成 |
 | POST | /api/tasks/{id}/cancel | 取消任务 |
+| POST | /api/tasks/{id}/drop | 放弃任务 |
+| POST | /api/tasks/{id}/views | 浏览次数 |
 | GET | /api/tasks/my/published | 我发布的任务 |
 | GET | /api/tasks/my/accepted | 我接取的任务 |
 | GET | /api/admin/stats | 系统统计 |
@@ -155,23 +166,33 @@ cd server
 ```
 Campus-Guild-TaskFlow/
 ├── server/                    # Spring Boot 后端
-│   └── src/main/java/...
-│       ├── config/          # 配置类
-│       ├── controller/     # REST API
-│       ├── service/       # 业务逻辑
-│       ├── model/         # 数据模型
-│       └── repository/    # 数据访问
+│   ├── src/main/java/...
+│   │   ├── config/          # 配置类
+│   │   ├── controller/     # REST API
+│   │   ├── service/       # 业务逻辑
+│   │   ├── model/         # 数据模型
+│   │   ├── repository/    # 数据访问
+│   │   ├── common/        # 公共工具
+│   │   └── exception/    # 异常处理
+│   ├── src/test/java/...    # 测试
+│   └── data/               # H2 数据库文件
 │
 ├── ui/                      # 前端
 │   ├── index.html          # 入口页面
 │   ├── js/
-│   │   ├── app.js        # 主应用代码
-│   │   └── bundle.js     # esbuild 输出
+│   │   ├── app.js        # 主应用代码（本地开发直接加载）
+│   │   └── bundle.js     # esbuild 产出（生产部署用）
 │   └── css/
 │       └── style.css     # 样式
 │
-├── data/                    # H2 数据库文件
-│   └── campusguild.mv.db
+├── sql/                     # 数据库脚本
+│   └── schema.sql          # 建表 DDL
+│
+├── docs/                    # 项目文档
+│   └── report/            # 结项报告
+│
+├── .github/workflows/       # CI/CD 部署
+│   └── deploy.yml
 │
 └── README.md
 ```
@@ -202,13 +223,11 @@ spring:
 
 ### 前端构建命令
 
-不要使用 `--bundle` 标志：
-```bash
-# 错误（会导致函数作用域问题）
-npx esbuild js/app.js --bundle --outfile=js/bundle.js --minify
+本地开发直接使用 `ui/index.html`，无需构建。
 
-# 正确
-npx esbuild js/app.js --outfile=js/bundle.js --minify
+生产部署时：
+```bash
+npx esbuild js/app.js --bundle --outfile=js/bundle.js --minify
 ```
 
 ### 状态值说明

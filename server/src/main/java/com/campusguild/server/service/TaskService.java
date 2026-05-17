@@ -64,11 +64,11 @@ public class TaskService {
         Page<Task> taskPage;
 
         if (keyword != null && !keyword.isBlank()) {
-            taskPage = taskRepository.findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(keyword, pageable);
+            taskPage = taskRepository.findByTitleContainingAndStatusAndPublisherNotBanned(keyword, TaskStatus.PENDING, pageable);
         } else if (category != null && !category.isBlank()) {
-            taskPage = taskRepository.findByCategoryAndStatusOrderByCreatedAtDesc(category, TaskStatus.PENDING, pageable);
+            taskPage = taskRepository.findByCategoryAndStatusAndPublisherNotBanned(category, TaskStatus.PENDING, pageable);
         } else {
-            taskPage = taskRepository.findByStatusOrderByCreatedAtDesc(TaskStatus.PENDING, pageable);
+            taskPage = taskRepository.findPendingByPublisherNotBanned(TaskStatus.PENDING, pageable);
         }
 
         return new PageResult<>(
@@ -123,6 +123,9 @@ public class TaskService {
         task = taskRepository.save(task);
 
         // 结算：接单者获得赏金和经验值
+        if (task.getAccepter() == null) {
+            throw new BusinessException("任务无接取者，无法确认完成");
+        }
         pointsService.settleReward(task.getAccepter(), task.getReward());
 
         return TaskDTO.fromEntity(task);
@@ -139,6 +142,10 @@ public class TaskService {
 
         if (task.getStatus() == TaskStatus.COMPLETED) {
             throw new BusinessException("已完成任务无法取消");
+        }
+
+        if (task.getStatus() == TaskStatus.CANCELLED) {
+            throw new BusinessException("任务已被取消");
         }
 
         // 退还积分给发布者
@@ -173,6 +180,27 @@ public class TaskService {
     public TaskDTO getTaskDetail(Long taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new BusinessException("任务不存在"));
+        return TaskDTO.fromEntity(task);
+    }
+
+    @Transactional
+    public TaskDTO dropTask(Long taskId, Long userId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("任务不存在"));
+
+        if (task.getStatus() != TaskStatus.IN_PROGRESS) {
+            throw new BusinessException("只能放弃进行中的任务");
+        }
+
+        if (task.getAccepter() == null || !task.getAccepter().getId().equals(userId)) {
+            throw new BusinessException("只有接取者可以放弃任务");
+        }
+
+        task.setAccepter(null);
+        task.setStatus(TaskStatus.PENDING);
+        task.setDeadline(java.time.LocalDateTime.now().plusDays(7));
+        task = taskRepository.save(task);
+
         return TaskDTO.fromEntity(task);
     }
 

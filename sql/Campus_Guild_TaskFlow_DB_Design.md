@@ -310,6 +310,7 @@ CREATE TABLE tasks (
     FOREIGN KEY (accepter_id) REFERENCES users(id)
 );
 
+
 -- 索引
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_publisher ON tasks(publisher_id);
@@ -329,4 +330,3 @@ CREATE INDEX idx_users_guild_level ON users(guild_level);
 
 ---
 
-*本文档使用 Markdown 格式编写，可用任何文本编辑器打开，也可通过 Typora、VS Code 等工具预览渲染效果。*

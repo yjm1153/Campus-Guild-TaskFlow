@@ -1,5 +1,6 @@
 package com.campusguild.server.controller;
 
+import com.campusguild.server.common.AuthUtil;
 import com.campusguild.server.common.PageResult;
 import com.campusguild.server.common.Result;
 import com.campusguild.server.model.dto.TaskDTO;
@@ -22,7 +23,7 @@ public class TaskController {
     @PostMapping
     public Result<TaskDTO> publish(HttpServletRequest request,
                                    @Valid @RequestBody TaskPublishRequest req) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(taskService.publishTask(userId, req));
     }
 
@@ -47,20 +48,26 @@ public class TaskController {
 
     @PostMapping("/{taskId}/accept")
     public Result<TaskDTO> accept(@PathVariable Long taskId, HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(taskService.acceptTask(taskId, userId));
     }
 
     @PostMapping("/{taskId}/complete")
     public Result<TaskDTO> complete(@PathVariable Long taskId, HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(taskService.confirmComplete(taskId, userId));
     }
 
     @PostMapping("/{taskId}/cancel")
     public Result<TaskDTO> cancel(@PathVariable Long taskId, HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(taskService.cancelTask(taskId, userId));
+    }
+
+    @PostMapping("/{taskId}/drop")
+    public Result<TaskDTO> drop(@PathVariable Long taskId, HttpServletRequest request) {
+        Long userId = AuthUtil.requireUserId(request);
+        return Result.success(taskService.dropTask(taskId, userId));
     }
 
     @GetMapping("/my/published")
@@ -68,7 +75,7 @@ public class TaskController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(taskService.getMyPublishedTasks(userId, page, pageSize));
     }
 
@@ -77,7 +84,7 @@ public class TaskController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = AuthUtil.requireUserId(request);
         return Result.success(taskService.getMyAcceptedTasks(userId, page, pageSize));
     }
 }
